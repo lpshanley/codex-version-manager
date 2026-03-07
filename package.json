@@ -1,0 +1,37 @@
+{
+	"name": "@lpshanley/cvm",
+	"version": "0.1.0",
+	"description": "Codex Version Manager — install, downgrade, and manage OpenAI Codex desktop app versions on macOS. Automatically repacks for Intel when needed.",
+	"type": "module",
+	"bin": {
+		"cvm": "./dist/index.js"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsx src/index.ts",
+		"check": "biome check .",
+		"check:fix": "biome check --fix .",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:watch": "vitest"
+	},
+	"keywords": ["codex", "openai", "version-manager", "intel", "macos", "electron", "downgrade"],
+	"author": "Lucas Shanley",
+	"license": "ISC",
+	"packageManager": "pnpm@10.9.0",
+	"files": ["dist"],
+	"dependencies": {
+		"commander": "^14.0.3",
+		"fast-xml-parser": "^5.4.2",
+		"plist": "^3.1.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/node": "^25.3.5",
+		"@types/plist": "^3.0.5",
+		"@vitest/coverage-v8": "^3.2.4",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.4"
+	}
+}

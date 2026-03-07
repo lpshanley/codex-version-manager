@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Local working directories
+/tmp/
+
+# Repacked / extracted app artifacts
+/Codex.app
+/Codex-intel.app
+/Codex.dmg
+/*.dmg
