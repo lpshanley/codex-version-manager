@@ -18,6 +18,10 @@
 	"keywords": ["codex", "openai", "version-manager", "intel", "macos", "electron", "downgrade"],
 	"author": "Lucas Shanley",
 	"license": "ISC",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/lpshanley/codex-version-manager.git"
+	},
 	"packageManager": "pnpm@10.9.0",
 	"files": ["dist"],
 	"dependencies": {
