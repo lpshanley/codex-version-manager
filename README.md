@@ -72,6 +72,23 @@ Options:
 - `--no-dmg` — output a bare `.app` instead of a DMG
 - `--keep-sparkle` — keep Sparkle auto-update (advanced)
 
+### `cvm update`
+
+Check for and install Codex updates. Compares the installed version against the latest in the update feed.
+
+```sh
+cvm update                   # check and update interactively
+cvm update --yes             # skip confirmation prompts
+```
+
+If Codex is not installed, offers to install the latest version. If an update is available, confirms before proceeding — automatically closing Codex if it's running and reopening it after the update.
+
+Options:
+- `--dest <path>` — path to Codex.app (default `/Applications/Codex.app`)
+- `--yes` — skip confirmation prompts
+- `--no-sign` — skip ad-hoc code signing
+- `--no-cache` — rebuild everything from scratch
+
 ### `cvm inspect <path>`
 
 Show metadata from a `.app` bundle or `.dmg`: version, architecture, Electron version, native modules, etc.

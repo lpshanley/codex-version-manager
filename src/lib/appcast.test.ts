@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchVersions, formatSize, parseAppcast } from "./appcast.js";
+import {
+	type AppcastItem,
+	fetchVersions,
+	formatSize,
+	parseAppcast,
+	resolveVersion,
+} from "./appcast.js";
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
@@ -111,6 +117,47 @@ describe("fetchVersions", () => {
 		await expect(fetchVersions("https://example.com/missing")).rejects.toThrow(
 			"Failed to fetch appcast: 404 Not Found",
 		);
+	});
+});
+
+describe("resolveVersion", () => {
+	const items: AppcastItem[] = [
+		{
+			version: "26.305.950",
+			build: "1050",
+			date: "2025-02-28",
+			size: 123456789,
+			url: "https://example.com/26.zip",
+			minOS: "13",
+		},
+		{
+			version: "25.200.800",
+			build: "1040",
+			date: "2025-02-10",
+			size: 100000000,
+			url: "https://example.com/25.zip",
+			minOS: "13",
+		},
+	];
+
+	it("returns first item for 'latest'", () => {
+		expect(resolveVersion(items, "latest")).toBe(items[0]);
+	});
+
+	it("finds by version string", () => {
+		expect(resolveVersion(items, "25.200.800")).toBe(items[1]);
+	});
+
+	it("finds by build number", () => {
+		expect(resolveVersion(items, "1040")).toBe(items[1]);
+	});
+
+	it("throws for unknown version", () => {
+		expect(() => resolveVersion(items, "99.0.0")).toThrow('Version "99.0.0" not found');
+	});
+
+	it("includes available versions in error message", () => {
+		expect(() => resolveVersion(items, "99.0.0")).toThrow("26.305.950, 25.200.800");
 	});
 });
 

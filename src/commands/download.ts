@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Command } from "commander";
-import { type AppcastItem, fetchVersions, formatSize } from "../lib/appcast.js";
+import { fetchVersions, formatSize, resolveVersion } from "../lib/appcast.js";
 import { currentArch, needsRepack } from "../lib/arch.js";
 import { repackApp } from "../lib/repack.js";
 
@@ -86,20 +86,4 @@ export function registerDownloadCommand(program: Command): void {
 				log(`Codex ${item.version} saved to ${appDst}`);
 			}
 		});
-}
-
-function resolveVersion(items: AppcastItem[], version: string): AppcastItem {
-	if (version === "latest") {
-		return items[0];
-	}
-
-	const match = items.find((i) => i.version === version || i.build === version);
-
-	if (!match) {
-		const available = items.map((i) => i.version).join(", ");
-		console.error(`Version "${version}" not found. Available: ${available}`);
-		process.exit(1);
-	}
-
-	return match;
 }
