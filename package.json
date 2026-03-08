@@ -15,15 +15,7 @@
 		"test:coverage": "vitest run --coverage",
 		"test:watch": "vitest"
 	},
-	"keywords": [
-		"codex",
-		"openai",
-		"version-manager",
-		"intel",
-		"macos",
-		"electron",
-		"downgrade"
-	],
+	"keywords": ["codex", "openai", "version-manager", "intel", "macos", "electron", "downgrade"],
 	"author": "Lucas Shanley",
 	"license": "ISC",
 	"repository": {
@@ -34,9 +26,7 @@
 		"node": ">=22"
 	},
 	"packageManager": "pnpm@10.9.0",
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"dependencies": {
 		"commander": "^14.0.3",
 		"fast-xml-parser": "^5.4.2",
