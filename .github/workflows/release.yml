@@ -11,6 +11,10 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release-please.outputs.releases_created }}
+      prs_created: ${{ steps.release-please.outputs.prs_created }}
+      pr: ${{ steps.release-please.outputs.pr }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release-please
@@ -41,3 +45,26 @@ jobs:
           git add -A
           git diff --staged --quiet || git commit -m "chore: format release files"
           git push
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --ignore-workspace
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
