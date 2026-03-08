@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,6 +45,7 @@ describe("cache", () => {
 		const info = getCacheInfo();
 		expect(info.electron).toEqual([]);
 		expect(info.natives).toEqual([]);
+		expect(info.totalSize).toBe(0);
 	});
 
 	it("clearCache removes all cache dirs", async () => {
@@ -52,13 +53,18 @@ describe("cache", () => {
 		const nativesDir = join(cacheDir, "cvm", "natives");
 		mkdirSync(electronDir, { recursive: true });
 		mkdirSync(nativesDir, { recursive: true });
-		writeFileSync(join(electronDir, "test.zip"), "data");
+		const electronFile = join(electronDir, "test.zip");
+		const nativeDir = join(nativesDir, "native-build");
+		writeFileSync(electronFile, "data");
+		mkdirSync(nativeDir, { recursive: true });
 
 		const { clearCache } = await import("./cache.js");
-		clearCache();
+		const result = clearCache();
 
-		expect(existsSync(electronDir)).toBe(false);
-		expect(existsSync(nativesDir)).toBe(false);
+		expect(existsSync(electronFile)).toBe(false);
+		expect(existsSync(nativeDir)).toBe(false);
+		expect(result.removedEntries).toBe(2);
+		expect(result.reclaimedSize).toBeGreaterThan(0);
 	});
 
 	it("clearCache can target only electron", async () => {
@@ -66,14 +72,17 @@ describe("cache", () => {
 		const nativesDir = join(cacheDir, "cvm", "natives");
 		mkdirSync(electronDir, { recursive: true });
 		mkdirSync(nativesDir, { recursive: true });
-		writeFileSync(join(electronDir, "test.zip"), "data");
-		writeFileSync(join(nativesDir, "test"), "data");
+		const electronFile = join(electronDir, "test.zip");
+		const nativeFile = join(nativesDir, "test");
+		writeFileSync(electronFile, "data");
+		writeFileSync(nativeFile, "data");
 
 		const { clearCache } = await import("./cache.js");
-		clearCache("electron");
+		const result = clearCache("electron");
 
-		expect(existsSync(electronDir)).toBe(false);
-		expect(existsSync(nativesDir)).toBe(true);
+		expect(existsSync(electronFile)).toBe(false);
+		expect(existsSync(nativeFile)).toBe(true);
+		expect(result.removedEntries).toBe(1);
 	});
 
 	it("clearCache can target only natives", async () => {
@@ -81,14 +90,17 @@ describe("cache", () => {
 		const nativesDir = join(cacheDir, "cvm", "natives");
 		mkdirSync(electronDir, { recursive: true });
 		mkdirSync(nativesDir, { recursive: true });
-		writeFileSync(join(electronDir, "test.zip"), "data");
-		writeFileSync(join(nativesDir, "test"), "data");
+		const electronFile = join(electronDir, "test.zip");
+		const nativeFile = join(nativesDir, "test");
+		writeFileSync(electronFile, "data");
+		writeFileSync(nativeFile, "data");
 
 		const { clearCache } = await import("./cache.js");
-		clearCache("natives");
+		const result = clearCache("natives");
 
-		expect(existsSync(electronDir)).toBe(true);
-		expect(existsSync(nativesDir)).toBe(false);
+		expect(existsSync(electronFile)).toBe(true);
+		expect(existsSync(nativeFile)).toBe(false);
+		expect(result.removedEntries).toBe(1);
 	});
 
 	it("getElectronCachePath returns correct path and creates directory", async () => {
@@ -146,8 +158,9 @@ describe("cache", () => {
 
 		const { getCacheInfo } = await import("./cache.js");
 		const info = getCacheInfo();
-		expect(info.electron).toContain("electron-v40.0.0-darwin-x64.zip");
-		expect(info.natives).toContain("better-sqlite3@12.0.0-electron-40.0.0-x64");
+		expect(info.electron[0]?.name).toBe("electron-v40.0.0-darwin-x64.zip");
+		expect(info.natives[0]?.name).toBe("better-sqlite3@12.0.0-electron-40.0.0-x64");
+		expect(info.totalSize).toBeGreaterThan(0);
 	});
 
 	it("getCacheInfo filters non-zip files from electron list", async () => {
@@ -158,6 +171,24 @@ describe("cache", () => {
 
 		const { getCacheInfo } = await import("./cache.js");
 		const info = getCacheInfo();
-		expect(info.electron).toEqual(["electron-v40.0.0-darwin-x64.zip"]);
+		expect(info.electron.map((entry) => entry.name)).toEqual(["electron-v40.0.0-darwin-x64.zip"]);
+	});
+
+	it("pruneCache removes stale cache entries", async () => {
+		const electronDir = join(cacheDir, "cvm", "electron");
+		mkdirSync(electronDir, { recursive: true });
+		const staleZip = join(electronDir, "electron-v40.0.0-darwin-x64.zip");
+		const freshZip = join(electronDir, "electron-v41.0.0-darwin-x64.zip");
+		writeFileSync(staleZip, "stale");
+		writeFileSync(freshZip, "fresh");
+		const staleDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1_000);
+		utimesSync(staleZip, staleDate, staleDate);
+
+		const { pruneCache } = await import("./cache.js");
+		const result = pruneCache(30, "electron");
+
+		expect(result.removedEntries).toBe(1);
+		expect(existsSync(staleZip)).toBe(false);
+		expect(existsSync(freshZip)).toBe(true);
 	});
 });

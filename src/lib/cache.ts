@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -68,44 +68,112 @@ export function cacheNativeDir(
 
 // -- Cache management --
 
+export interface CacheEntry {
+	name: string;
+	path: string;
+	size: number;
+	modifiedAt: Date;
+}
+
 export interface CacheInfo {
 	path: string;
-	electron: string[];
-	natives: string[];
+	electron: CacheEntry[];
+	natives: CacheEntry[];
+	electronSize: number;
+	nativesSize: number;
 	totalSize: number;
+}
+
+export interface CacheMutationResult {
+	removedEntries: number;
+	reclaimedSize: number;
+}
+
+function getPathSize(path: string): number {
+	const stats = statSync(path);
+	if (!stats.isDirectory()) {
+		return stats.size;
+	}
+
+	return readdirSync(path).reduce((total, entry) => total + getPathSize(join(path, entry)), 0);
+}
+
+function listCacheEntries(
+	dir: string,
+	filter: (name: string) => boolean = () => true,
+): CacheEntry[] {
+	if (!existsSync(dir)) {
+		return [];
+	}
+
+	return readdirSync(dir)
+		.filter(filter)
+		.map((name) => {
+			const path = join(dir, name);
+			const stats = statSync(path);
+			return {
+				name,
+				path,
+				size: getPathSize(path),
+				modifiedAt: stats.mtime,
+			};
+		})
+		.sort((left, right) => right.modifiedAt.getTime() - left.modifiedAt.getTime());
 }
 
 export function getCacheInfo(): CacheInfo {
 	const dir = getCacheDir();
-	const info: CacheInfo = { path: dir, electron: [], natives: [], totalSize: 0 };
 
 	const electronDir = join(dir, "electron");
-	if (existsSync(electronDir)) {
-		info.electron = readdirSync(electronDir).filter((f) => f.endsWith(".zip"));
-	}
-
 	const nativesDir = join(dir, "natives");
-	if (existsSync(nativesDir)) {
-		info.natives = readdirSync(nativesDir);
-	}
+	const electron = listCacheEntries(electronDir, (name) => name.endsWith(".zip"));
+	const natives = listCacheEntries(nativesDir);
+	const electronSize = electron.reduce((total, entry) => total + entry.size, 0);
+	const nativesSize = natives.reduce((total, entry) => total + entry.size, 0);
 
-	return info;
+	return {
+		path: dir,
+		electron,
+		natives,
+		electronSize,
+		nativesSize,
+		totalSize: electronSize + nativesSize,
+	};
 }
 
-export function clearCache(target?: "electron" | "natives"): void {
-	const dir = getCacheDir();
+function removeEntries(paths: string[]): CacheMutationResult {
+	let reclaimedSize = 0;
 
-	if (!target || target === "electron") {
-		const electronDir = join(dir, "electron");
-		if (existsSync(electronDir)) {
-			rmSync(electronDir, { recursive: true, force: true });
-		}
+	for (const path of paths) {
+		reclaimedSize += getPathSize(path);
+		rmSync(path, { recursive: true, force: true });
 	}
 
-	if (!target || target === "natives") {
-		const nativesDir = join(dir, "natives");
-		if (existsSync(nativesDir)) {
-			rmSync(nativesDir, { recursive: true, force: true });
-		}
+	return { removedEntries: paths.length, reclaimedSize };
+}
+
+function targetEntries(target?: "electron" | "natives"): CacheEntry[] {
+	const info = getCacheInfo();
+	if (target === "electron") {
+		return info.electron;
 	}
+	if (target === "natives") {
+		return info.natives;
+	}
+
+	return [...info.electron, ...info.natives];
+}
+
+export function clearCache(target?: "electron" | "natives"): CacheMutationResult {
+	return removeEntries(targetEntries(target).map((entry) => entry.path));
+}
+
+export function pruneCache(
+	maxAgeDays: number,
+	target?: "electron" | "natives",
+): CacheMutationResult {
+	const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1_000;
+	const staleEntries = targetEntries(target).filter((entry) => entry.modifiedAt.getTime() < cutoff);
+
+	return removeEntries(staleEntries.map((entry) => entry.path));
 }

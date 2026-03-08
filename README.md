@@ -98,15 +98,16 @@ cvm inspect /Applications/Codex.app
 cvm inspect ~/Downloads/CodexIntel.dmg
 ```
 
-### `cvm cache status` / `cvm cache clear`
+### `cvm cache status` / `cvm cache clear` / `cvm cache prune`
 
-View or clear the build cache (`~/.cache/cvm/`). The cache stores downloaded Electron runtimes and rebuilt native modules.
+View, prune, or clear the build cache (`~/.cache/cvm/`). The cache stores downloaded Electron runtimes and rebuilt native modules.
 
 ```sh
 cvm cache status
 cvm cache clear              # clear everything
 cvm cache clear --electron   # only Electron zips
 cvm cache clear --natives    # only native module builds
+cvm cache prune --days 30    # remove entries older than 30 days
 ```
 
 ## How the Intel repack works
