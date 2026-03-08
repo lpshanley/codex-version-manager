@@ -9,6 +9,8 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Skip CI on release-please merge commits — the publish job already runs check/test/build
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(main): release') }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
