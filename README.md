@@ -1,5 +1,8 @@
 # cvm — Codex Version Manager
 
+[![CI](https://github.com/lpshanley/codex-version-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/lpshanley/codex-version-manager/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/lpshanley/codex-version-manager/graph/badge.svg)](https://codecov.io/gh/lpshanley/codex-version-manager)
+
 Install, downgrade, and manage [OpenAI Codex](https://openai.com/index/codex/) desktop app versions on macOS.
 
 On Intel Macs, cvm automatically repacks the ARM-only Codex release into a native x86_64 app — no Rosetta required. On Apple Silicon, it works as a straightforward version manager.
