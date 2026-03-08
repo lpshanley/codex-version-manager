@@ -18,8 +18,6 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         id: release-please
-        with:
-          release-type: node
 
       # Format files modified by release-please (e.g. package.json version bump)
       - uses: actions/checkout@v4
@@ -34,6 +32,7 @@ jobs:
         if: steps.release-please.outputs.prs_created == 'true'
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Format and commit
         if: steps.release-please.outputs.prs_created == 'true'
@@ -42,7 +41,7 @@ jobs:
           pnpm check:fix
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add package.json CHANGELOG.md
           git diff --staged --quiet || git commit -m "chore: format release files"
           git push
 
@@ -58,7 +57,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --ignore-workspace
