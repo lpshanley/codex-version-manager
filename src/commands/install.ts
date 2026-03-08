@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { fetchVersions, formatSize, resolveVersion } from "../lib/appcast.js";
 import { currentArch } from "../lib/arch.js";
 import { installVersion } from "../lib/install.js";
+import { requireAppcastItems } from "../lib/release.js";
 
 export function registerInstallCommand(program: Command): void {
 	program
@@ -17,11 +18,7 @@ export function registerInstallCommand(program: Command): void {
 			log(`System architecture: ${currentArch()}`);
 
 			log("Fetching version list");
-			const items = await fetchVersions();
-			if (items.length === 0) {
-				console.error("No versions found in the update feed.");
-				process.exit(1);
-			}
+			const items = requireAppcastItems(await fetchVersions());
 
 			const item = resolveVersion(items, version);
 			log(`Selected: ${item.version} (build ${item.build}, ${formatSize(item.size)})`);

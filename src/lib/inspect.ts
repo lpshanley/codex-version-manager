@@ -1,10 +1,10 @@
-import { execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import plist from "plist";
 import { listNativeModules, readFileFromAsar } from "./asar.js";
 import type { NativeModule } from "./asar.js";
+import { run, runOutput } from "./shell.js";
 
 export type { NativeModule };
 
@@ -35,7 +35,7 @@ async function inspectDmg(dmgPath: string): Promise<AppInfo> {
 	const mountPoint = mkdtempSync(join(tmpdir(), "cvm-"));
 
 	try {
-		execSync(
+		run(
 			`hdiutil attach ${JSON.stringify(dmgPath)} -nobrowse -readonly -mountpoint ${JSON.stringify(mountPoint)}`,
 			{ stdio: "pipe" },
 		);
@@ -50,9 +50,7 @@ async function inspectDmg(dmgPath: string): Promise<AppInfo> {
 		return await inspectAppBundle(join(mountPoint, appName));
 	} finally {
 		try {
-			execSync(`hdiutil detach ${JSON.stringify(mountPoint)} -quiet`, {
-				stdio: "pipe",
-			});
+			run(`hdiutil detach ${JSON.stringify(mountPoint)} -quiet`, { stdio: "pipe" });
 		} catch {
 			// Best effort unmount
 		}
@@ -128,9 +126,7 @@ function detectArchitectures(binaryPath: string): string[] {
 	}
 
 	try {
-		const output = execSync(`file ${JSON.stringify(binaryPath)}`, {
-			encoding: "utf-8",
-		});
+		const output = runOutput(`file ${JSON.stringify(binaryPath)}`);
 
 		const archs: string[] = [];
 		if (output.includes("arm64")) archs.push("arm64");

@@ -1,11 +1,11 @@
-import { execSync } from "node:child_process";
+import { run } from "./shell.js";
 
 /**
  * Check if a macOS application is currently running.
  */
 export function isAppRunning(appName: string): boolean {
 	try {
-		execSync(`pgrep -x ${JSON.stringify(appName)}`, { stdio: "pipe" });
+		run(`pgrep -x ${JSON.stringify(appName)}`, { stdio: "pipe" });
 		return true;
 	} catch {
 		return false;
@@ -20,12 +20,10 @@ export async function quitApp(appName: string, timeoutMs = 10_000): Promise<void
 	if (!isAppRunning(appName)) return;
 
 	try {
-		execSync(`osascript -e 'tell application ${JSON.stringify(appName)} to quit'`, {
-			stdio: "pipe",
-		});
+		run(`osascript -e 'tell application ${JSON.stringify(appName)} to quit'`, { stdio: "pipe" });
 	} catch {
 		try {
-			execSync(`pkill -x ${JSON.stringify(appName)}`, { stdio: "pipe" });
+			run(`pkill -x ${JSON.stringify(appName)}`, { stdio: "pipe" });
 		} catch {
 			return;
 		}
@@ -40,7 +38,7 @@ export async function quitApp(appName: string, timeoutMs = 10_000): Promise<void
 
 	// Force kill as last resort
 	try {
-		execSync(`pkill -9 -x ${JSON.stringify(appName)}`, { stdio: "pipe" });
+		run(`pkill -9 -x ${JSON.stringify(appName)}`, { stdio: "pipe" });
 	} catch {
 		// already dead
 	}
@@ -50,5 +48,5 @@ export async function quitApp(appName: string, timeoutMs = 10_000): Promise<void
  * Open a macOS application by path.
  */
 export function openApp(appPath: string): void {
-	execSync(`open ${JSON.stringify(appPath)}`, { stdio: "pipe" });
+	run(`open ${JSON.stringify(appPath)}`, { stdio: "pipe" });
 }

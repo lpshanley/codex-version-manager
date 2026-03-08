@@ -1,4 +1,3 @@
-import { execSync, spawn } from "node:child_process";
 import {
 	chmodSync,
 	cpSync,
@@ -19,6 +18,8 @@ import {
 	getCachedNative,
 	getElectronCachePath,
 } from "./cache.js";
+import { CliError } from "./errors.js";
+import { run, runOutput, runProcess } from "./shell.js";
 
 export interface RepackOptions {
 	input: string;
@@ -47,7 +48,7 @@ export async function repackApp(
 		mountPoint = join(tmpdir(), `cvm-mount-${Date.now()}`);
 		mkdirSync(mountPoint, { recursive: true });
 		log(`Mounting ${basename(inputPath)}`);
-		execSync(
+		run(
 			`hdiutil attach ${JSON.stringify(inputPath)} -nobrowse -readonly -mountpoint ${JSON.stringify(mountPoint)}`,
 			{ stdio: "pipe" },
 		);
@@ -77,7 +78,7 @@ export async function repackApp(
 		const runtimeDir = join(workDir, "electron-runtime");
 		mkdirSync(runtimeDir);
 		log("Extracting Electron x64 runtime");
-		execSync(`unzip -q ${JSON.stringify(electronZip)} -d ${JSON.stringify(runtimeDir)}`, {
+		run(`unzip -q ${JSON.stringify(electronZip)} -d ${JSON.stringify(runtimeDir)}`, {
 			stdio: "pipe",
 		});
 
@@ -97,12 +98,20 @@ export async function repackApp(
 		const asarPath = join(targetApp, "Contents", "Resources", "app.asar");
 		const bsVersion = getModuleVersionFromAsar(asarPath, "better-sqlite3");
 		const npVersion = getModuleVersionFromAsar(asarPath, "node-pty");
+		const codexVersion = getBundledCliVersion(targetApp);
 
 		if (bsVersion) log(`Detected better-sqlite3@${bsVersion}`);
 		if (npVersion) log(`Detected node-pty@${npVersion}`);
+		log(`Detected bundled codex-cli@${codexVersion}`);
 
 		// 7. Create temp build project for @electron/rebuild + CLI binaries
-		const buildProjectDir = await createBuildProject(electronVersion, bsVersion, npVersion, log);
+		const buildProjectDir = await createBuildProject(
+			electronVersion,
+			codexVersion,
+			bsVersion,
+			npVersion,
+			log,
+		);
 
 		try {
 			// 8. Rebuild native modules with @electron/rebuild
@@ -132,30 +141,24 @@ export async function repackApp(
 				const moduleList = modulesToRebuild.join(",");
 				log(`Rebuilding ${moduleList} with @electron/rebuild for x64`);
 
-				await new Promise<void>((resolve, reject) => {
-					const proc = spawn(
-						"npx",
-						[
-							"@electron/rebuild",
-							"-f",
-							"-w",
-							moduleList,
-							"--arch=x64",
-							`--version=${electronVersion}`,
-							"-m",
-							buildProjectDir,
-						],
-						{
-							cwd: buildProjectDir,
-							stdio: "pipe",
-						},
-					);
-					proc.on("close", (code: number) => {
-						if (code === 0) resolve();
-						else reject(new Error(`@electron/rebuild exited with code ${code}`));
-					});
-					proc.on("error", reject);
-				});
+				await runProcess(
+					"pnpm",
+					[
+						"exec",
+						"electron-rebuild",
+						"-f",
+						"-w",
+						moduleList,
+						"--arch=x64",
+						`--version=${electronVersion}`,
+						"-m",
+						buildProjectDir,
+					],
+					{
+						cwd: buildProjectDir,
+						stdio: "pipe",
+					},
+				);
 
 				// Cache and install rebuilt modules
 				for (const modName of modulesToRebuild) {
@@ -216,7 +219,7 @@ export async function repackApp(
 		// Unmount DMG if we mounted one
 		if (mountPoint) {
 			try {
-				execSync(`hdiutil detach ${JSON.stringify(mountPoint)} -quiet`, { stdio: "pipe" });
+				run(`hdiutil detach ${JSON.stringify(mountPoint)} -quiet`, { stdio: "pipe" });
 			} catch {
 				// best effort
 			}
@@ -280,7 +283,7 @@ async function ensureElectronX64(version: string, useCache: boolean, log: LogFn)
 	const url = `https://github.com/electron/electron/releases/download/v${version}/electron-v${version}-darwin-x64.zip`;
 
 	log(`Downloading Electron x64 v${version}`);
-	execSync(`curl -fL --retry 3 --retry-delay 2 ${JSON.stringify(url)} -o ${JSON.stringify(dest)}`, {
+	run(`curl -fL --retry 3 --retry-delay 2 ${JSON.stringify(url)} -o ${JSON.stringify(dest)}`, {
 		stdio: "pipe",
 	});
 
@@ -298,14 +301,14 @@ function buildTargetApp(electronApp: string, srcApp: string, targetApp: string, 
 	if (existsSync(targetApp)) {
 		rmSync(targetApp, { recursive: true });
 	}
-	execSync(`ditto ${JSON.stringify(electronApp)} ${JSON.stringify(targetApp)}`, { stdio: "pipe" });
+	run(`ditto ${JSON.stringify(electronApp)} ${JSON.stringify(targetApp)}`, { stdio: "pipe" });
 
 	// 2. Replace Resources with source app's Resources
 	const targetResources = join(targetApp, "Contents", "Resources");
 	const srcResources = join(srcApp, "Contents", "Resources");
 	log("Transplanting Resources from source app");
 	rmSync(targetResources, { recursive: true });
-	execSync(`ditto ${JSON.stringify(srcResources)} ${JSON.stringify(targetResources)}`, {
+	run(`ditto ${JSON.stringify(srcResources)} ${JSON.stringify(targetResources)}`, {
 		stdio: "pipe",
 	});
 
@@ -350,12 +353,43 @@ export function getModuleVersionFromAsar(asarPath: string, moduleName: string): 
 	}
 }
 
+function getBundledCliVersion(appPath: string): string {
+	const codexBinaryPath = join(appPath, "Contents", "Resources", "codex");
+	if (!existsSync(codexBinaryPath)) {
+		throw new CliError("Could not find bundled codex CLI in app resources");
+	}
+
+	const binary = readFileSync(codexBinaryPath).toString("latin1");
+	const embeddedVersion = binary.match(
+		/Update available!([0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.]+)?)See full release notes/,
+	)?.[1];
+
+	if (embeddedVersion) {
+		return embeddedVersion;
+	}
+
+	try {
+		const output = runOutput([JSON.stringify(codexBinaryPath), "--version"].join(" "), {
+			stdio: "pipe",
+		});
+		const runtimeVersion = output.match(/([0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.]+)?)/)?.[1];
+		if (runtimeVersion) {
+			return runtimeVersion;
+		}
+	} catch {
+		// Fall through to a CLI-specific error.
+	}
+
+	throw new CliError("Could not determine bundled codex CLI version");
+}
+
 // ---------------------------------------------------------------------------
 // Create temp npm build project (NEW)
 // ---------------------------------------------------------------------------
 
 async function createBuildProject(
 	electronVersion: string,
+	codexVersion: string,
 	bsVersion: string | null,
 	npVersion: string | null,
 	log: LogFn,
@@ -364,9 +398,10 @@ async function createBuildProject(
 	mkdirSync(projectDir, { recursive: true });
 
 	// @openai/codex publishes platform binaries as optional deps using npm aliases.
-	// On ARM Macs, npm skips the x64 variant, so we explicitly alias it.
+	// On ARM Macs, the desktop app bundle already tells us which Codex version to install,
+	// so we pin the x64 build explicitly instead of resolving a moving dist-tag.
 	const deps: Record<string, string> = {
-		"@openai/codex-darwin-x64": "npm:@openai/codex@darwin-x64",
+		"@openai/codex-darwin-x64": `npm:@openai/codex@${codexVersion}-darwin-x64`,
 	};
 	if (bsVersion) deps["better-sqlite3"] = bsVersion;
 	if (npVersion) deps["node-pty"] = npVersion;
@@ -389,7 +424,7 @@ async function createBuildProject(
 	);
 
 	log("Installing build dependencies (@electron/rebuild, native modules, codex CLI)");
-	execSync("npm install --force --no-audit --no-fund", {
+	run("pnpm install --ignore-workspace --force", {
 		cwd: projectDir,
 		stdio: "pipe",
 		env: { ...process.env },
@@ -593,17 +628,17 @@ export function disableSparkle(outApp: string, log: LogFn): void {
 function adHocSign(outApp: string, log: LogFn): void {
 	// Clear extended attributes
 	log("Clearing extended attributes");
-	execSync(`xattr -cr ${JSON.stringify(outApp)}`, { stdio: "pipe", shell: "/bin/bash" });
+	run(`xattr -cr ${JSON.stringify(outApp)}`, { stdio: "pipe", shell: "/bin/bash" });
 
 	// Single deep sign pass
 	log("Ad-hoc signing app bundle");
-	execSync(`codesign --force --deep --sign - --timestamp=none ${JSON.stringify(outApp)}`, {
+	run(`codesign --force --deep --sign - --timestamp=none ${JSON.stringify(outApp)}`, {
 		stdio: "pipe",
 	});
 
 	// Verify
 	log("Verifying signature");
-	execSync(`codesign --verify --deep --strict ${JSON.stringify(outApp)}`, { stdio: "pipe" });
+	run(`codesign --verify --deep --strict ${JSON.stringify(outApp)}`, { stdio: "pipe" });
 }
 
 // ---------------------------------------------------------------------------
@@ -617,20 +652,18 @@ function createDmg(appPath: string, dmgOutputPath: string, volumeName: string, l
 	mkdirSync(dmgRoot, { recursive: true });
 
 	// Copy app into staging dir using ditto
-	execSync(`ditto ${JSON.stringify(appPath)} ${JSON.stringify(join(dmgRoot, basename(appPath)))}`, {
+	run(`ditto ${JSON.stringify(appPath)} ${JSON.stringify(join(dmgRoot, basename(appPath)))}`, {
 		stdio: "pipe",
 	});
 
 	// Create Applications symlink for drag-to-install
-	execSync(`ln -s /Applications ${JSON.stringify(join(dmgRoot, "Applications"))}`, {
-		stdio: "pipe",
-	});
+	run(`ln -s /Applications ${JSON.stringify(join(dmgRoot, "Applications"))}`, { stdio: "pipe" });
 
 	// Build compressed DMG
 	if (existsSync(dmgOutputPath)) {
 		rmSync(dmgOutputPath);
 	}
-	execSync(
+	run(
 		`hdiutil create -volname ${JSON.stringify(volumeName)} -srcfolder ${JSON.stringify(dmgRoot)} -ov -format UDZO ${JSON.stringify(dmgOutputPath)}`,
 		{ stdio: "pipe" },
 	);
@@ -648,9 +681,7 @@ function verifyArch(outApp: string, log: LogFn): void {
 	log("Verifying x86_64 architecture");
 	// x64 Electron shell binary is named "Electron"
 	const mainBin = join(outApp, "Contents", "MacOS", "Electron");
-	const output = execSync(`file ${JSON.stringify(mainBin)}`, {
-		encoding: "utf-8",
-	});
+	const output = runOutput(`file ${JSON.stringify(mainBin)}`);
 
 	if (!output.includes("x86_64")) {
 		throw new Error(`Architecture verification failed: ${output.trim()}`);

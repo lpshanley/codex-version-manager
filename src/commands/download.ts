@@ -1,11 +1,12 @@
-import { execSync } from "node:child_process";
-import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Command } from "commander";
 import { fetchVersions, formatSize, resolveVersion } from "../lib/appcast.js";
 import { currentArch, needsRepack } from "../lib/arch.js";
+import { downloadAndExtractRelease, requireAppcastItems } from "../lib/release.js";
 import { repackApp } from "../lib/repack.js";
+import { run } from "../lib/shell.js";
 
 export function registerDownloadCommand(program: Command): void {
 	program
@@ -22,11 +23,7 @@ export function registerDownloadCommand(program: Command): void {
 
 			// 1. Resolve version
 			log("Fetching version list");
-			const items = await fetchVersions();
-			if (items.length === 0) {
-				console.error("No versions found in the update feed.");
-				process.exit(1);
-			}
+			const items = requireAppcastItems(await fetchVersions());
 
 			const item = resolveVersion(items, version);
 			log(`Selected: ${item.version} (build ${item.build}, ${formatSize(item.size)})`);
@@ -34,28 +31,7 @@ export function registerDownloadCommand(program: Command): void {
 			// 2. Download
 			const workDir = join(tmpdir(), `cvm-download-${Date.now()}`);
 			mkdirSync(workDir, { recursive: true });
-
-			const zipPath = join(workDir, `Codex-${item.version}.zip`);
-			log(`Downloading Codex ${item.version}`);
-			execSync(
-				`curl -fL --retry 3 --retry-delay 2 --progress-bar ${JSON.stringify(item.url)} -o ${JSON.stringify(zipPath)}`,
-				{ stdio: ["pipe", "inherit", "inherit"] },
-			);
-
-			// 3. Extract .app from zip
-			const extractDir = join(workDir, "extracted");
-			mkdirSync(extractDir);
-			execSync(`unzip -q ${JSON.stringify(zipPath)} -d ${JSON.stringify(extractDir)}`, {
-				stdio: "pipe",
-			});
-
-			const entries = readdirSync(extractDir);
-			const appName = entries.find((e) => e.endsWith(".app"));
-			if (!appName) {
-				throw new Error("No .app found in downloaded zip");
-			}
-
-			const srcApp = join(extractDir, appName);
+			const { appName, appPath: srcApp } = downloadAndExtractRelease(item, workDir, log);
 			const outDir = resolve(options.output);
 			mkdirSync(outDir, { recursive: true });
 
@@ -80,7 +56,7 @@ export function registerDownloadCommand(program: Command): void {
 			} else {
 				// ARM: just copy the .app to output dir
 				const appDst = join(outDir, appName);
-				execSync(`ditto ${JSON.stringify(srcApp)} ${JSON.stringify(appDst)}`, { stdio: "pipe" });
+				run(`ditto ${JSON.stringify(srcApp)} ${JSON.stringify(appDst)}`, { stdio: "pipe" });
 
 				rmSync(workDir, { recursive: true, force: true });
 				log(`Codex ${item.version} saved to ${appDst}`);

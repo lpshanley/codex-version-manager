@@ -68,6 +68,43 @@ export function resolveVersion(items: AppcastItem[], version: string): AppcastIt
 	return match;
 }
 
+function compareNumericSegments(a: string, b: string): number {
+	const aParts = a.split(".").map((part) => Number.parseInt(part, 10));
+	const bParts = b.split(".").map((part) => Number.parseInt(part, 10));
+	const length = Math.max(aParts.length, bParts.length);
+
+	for (let index = 0; index < length; index++) {
+		const left = aParts[index] ?? 0;
+		const right = bParts[index] ?? 0;
+
+		if (left !== right) {
+			return left - right;
+		}
+	}
+
+	return 0;
+}
+
+export function compareReleaseBuilds(
+	current: Pick<AppcastItem, "build" | "version">,
+	target: Pick<AppcastItem, "build" | "version">,
+): number {
+	const hasNumericBuilds =
+		current.build.length > 0 &&
+		target.build.length > 0 &&
+		/^\d+$/.test(current.build) &&
+		/^\d+$/.test(target.build);
+
+	if (hasNumericBuilds) {
+		const buildDelta = Number.parseInt(current.build, 10) - Number.parseInt(target.build, 10);
+		if (buildDelta !== 0) {
+			return buildDelta;
+		}
+	}
+
+	return compareNumericSegments(current.version, target.version);
+}
+
 export function formatSize(bytes: number): string {
 	if (bytes >= 1_000_000_000) {
 		return `${(bytes / 1_000_000_000).toFixed(1)} GB`;

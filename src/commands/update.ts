@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Command } from "commander";
-import { fetchVersions, formatSize } from "../lib/appcast.js";
+import { compareReleaseBuilds, fetchVersions, formatSize } from "../lib/appcast.js";
 import { currentArch } from "../lib/arch.js";
 import { inspectApp } from "../lib/inspect.js";
 import { installVersion } from "../lib/install.js";
 import { isAppRunning, openApp, quitApp } from "../lib/process.js";
 import { confirm } from "../lib/prompt.js";
+import { requireAppcastItems } from "../lib/release.js";
 
 const DEFAULT_APP_PATH = "/Applications/Codex.app";
 
@@ -26,11 +27,7 @@ export function registerUpdateCommand(program: Command): void {
 
 			// 1. Fetch latest version from appcast
 			log("Fetching version list");
-			const items = await fetchVersions();
-			if (items.length === 0) {
-				console.error("No versions found in the update feed.");
-				process.exit(1);
-			}
+			const items = requireAppcastItems(await fetchVersions());
 			const latest = items[0];
 
 			// 2. Check if app is installed
@@ -61,7 +58,7 @@ export function registerUpdateCommand(program: Command): void {
 			log(`Latest:    ${latest.version} (build ${latest.build})`);
 
 			// 4. Compare versions
-			if (currentBuild === latest.build) {
+			if (compareReleaseBuilds(info, latest) >= 0) {
 				console.log(`Codex is already up to date (${currentVersion}).`);
 				return;
 			}

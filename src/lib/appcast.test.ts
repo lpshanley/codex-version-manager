@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	type AppcastItem,
+	compareReleaseBuilds,
 	fetchVersions,
 	formatSize,
 	parseAppcast,
@@ -176,5 +177,25 @@ describe("formatSize", () => {
 
 	it("formats gigabytes", () => {
 		expect(formatSize(2_500_000_000)).toBe("2.5 GB");
+	});
+});
+
+describe("compareReleaseBuilds", () => {
+	it("prefers numeric build comparison when available", () => {
+		expect(
+			compareReleaseBuilds(
+				{ version: "26.200.1000", build: "1000" },
+				{ version: "26.305.950", build: "1050" },
+			),
+		).toBeLessThan(0);
+	});
+
+	it("falls back to dotted version comparison", () => {
+		expect(
+			compareReleaseBuilds(
+				{ version: "26.400.1000", build: "" },
+				{ version: "26.305.950", build: "" },
+			),
+		).toBeGreaterThan(0);
 	});
 });

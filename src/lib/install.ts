@@ -1,11 +1,11 @@
-import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AppcastItem } from "./appcast.js";
-import { formatSize } from "./appcast.js";
 import { needsRepack } from "./arch.js";
+import { downloadAndExtractRelease } from "./release.js";
 import { repackApp } from "./repack.js";
+import { run } from "./shell.js";
 
 export interface InstallOptions {
 	/** The AppcastItem describing the version to install */
@@ -30,33 +30,11 @@ export async function installVersion(
 ): Promise<void> {
 	const { item, dest: rawDest, sign, cache } = opts;
 
-	log(`Downloading Codex ${item.version} (${formatSize(item.size)})`);
-
 	const workDir = join(tmpdir(), `cvm-install-${Date.now()}`);
 	mkdirSync(workDir, { recursive: true });
 
 	try {
-		// Download
-		const zipPath = join(workDir, `Codex-${item.version}.zip`);
-		execSync(
-			`curl -fL --retry 3 --retry-delay 2 --progress-bar ${JSON.stringify(item.url)} -o ${JSON.stringify(zipPath)}`,
-			{ stdio: ["pipe", "inherit", "inherit"] },
-		);
-
-		// Extract
-		const extractDir = join(workDir, "extracted");
-		mkdirSync(extractDir);
-		execSync(`unzip -q ${JSON.stringify(zipPath)} -d ${JSON.stringify(extractDir)}`, {
-			stdio: "pipe",
-		});
-
-		const entries = readdirSync(extractDir);
-		const appName = entries.find((e) => e.endsWith(".app"));
-		if (!appName) {
-			throw new Error("No .app found in downloaded zip");
-		}
-
-		const srcApp = join(extractDir, appName);
+		const { appPath: srcApp } = downloadAndExtractRelease(item, workDir, log);
 		const dest = resolve(rawDest);
 
 		if (needsRepack()) {
@@ -78,15 +56,13 @@ export async function installVersion(
 			if (existsSync(dest)) {
 				rmSync(dest, { recursive: true });
 			}
-			execSync(`ditto ${JSON.stringify(repackedApp)} ${JSON.stringify(dest)}`, {
-				stdio: "pipe",
-			});
+			run(`ditto ${JSON.stringify(repackedApp)} ${JSON.stringify(dest)}`, { stdio: "pipe" });
 		} else {
 			log(`Installing to ${dest}`);
 			if (existsSync(dest)) {
 				rmSync(dest, { recursive: true });
 			}
-			execSync(`ditto ${JSON.stringify(srcApp)} ${JSON.stringify(dest)}`, { stdio: "pipe" });
+			run(`ditto ${JSON.stringify(srcApp)} ${JSON.stringify(dest)}`, { stdio: "pipe" });
 		}
 
 		log(`Codex ${item.version} installed to ${dest}`);
