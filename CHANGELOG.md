@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/lpshanley/codex-version-manager/compare/v1.1.1...v1.1.2) (2026-03-08)
+
+
+### Bug Fixes
+
+* **ci:** quote if expression to fix YAML syntax error ([0c0fee0](https://github.com/lpshanley/codex-version-manager/commit/0c0fee035cae4b469506e8081f72b89dfaa13360))
+
 ## [1.1.1](https://github.com/lpshanley/codex-version-manager/compare/v1.1.0...v1.1.1) (2026-03-08)
 
 
