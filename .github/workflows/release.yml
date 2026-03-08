@@ -13,5 +13,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release-please
         with:
           release-type: node
+
+      # Format files modified by release-please (e.g. package.json version bump)
+      - uses: actions/checkout@v4
+        if: steps.release-please.outputs.prs_created == 'true'
+        with:
+          ref: ${{ fromJSON(steps.release-please.outputs.pr).headBranchName }}
+
+      - uses: pnpm/action-setup@v4
+        if: steps.release-please.outputs.prs_created == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.release-please.outputs.prs_created == 'true'
+        with:
+          node-version: 22
+
+      - name: Format and commit
+        if: steps.release-please.outputs.prs_created == 'true'
+        run: |
+          pnpm install --ignore-workspace
+          pnpm check:fix
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "chore: format release files"
+          git push
