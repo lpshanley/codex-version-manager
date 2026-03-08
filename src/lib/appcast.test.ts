@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatSize, fetchVersions, parseAppcast } from "./appcast.js";
+import { fetchVersions, formatSize, parseAppcast } from "./appcast.js";
 
 const SAMPLE_XML = `<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
@@ -96,9 +96,7 @@ describe("fetchVersions", () => {
   </channel>
 </rss>`;
 
-		vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			new Response(xml, { status: 200 }),
-		);
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(xml, { status: 200 }));
 
 		const items = await fetchVersions("https://example.com/appcast.xml");
 		expect(items).toHaveLength(1);
