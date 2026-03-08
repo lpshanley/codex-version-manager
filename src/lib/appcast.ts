@@ -53,6 +53,21 @@ export function parseAppcast(xml: string): AppcastItem[] {
 	});
 }
 
+export function resolveVersion(items: AppcastItem[], version: string): AppcastItem {
+	if (version === "latest") {
+		return items[0];
+	}
+
+	const match = items.find((i) => i.version === version || i.build === version);
+
+	if (!match) {
+		const available = items.map((i) => i.version).join(", ");
+		throw new Error(`Version "${version}" not found. Available: ${available}`);
+	}
+
+	return match;
+}
+
 export function formatSize(bytes: number): string {
 	if (bytes >= 1_000_000_000) {
 		return `${(bytes / 1_000_000_000).toFixed(1)} GB`;

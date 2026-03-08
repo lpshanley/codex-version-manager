@@ -7,6 +7,7 @@ import { registerInspectCommand } from "./commands/inspect.js";
 import { registerInstallCommand } from "./commands/install.js";
 import { registerListCommand } from "./commands/list.js";
 import { registerRepackCommand } from "./commands/repack.js";
+import { registerUpdateCommand } from "./commands/update.js";
 
 program
 	.name("cvm")
@@ -18,6 +19,7 @@ registerInspectCommand(program);
 registerDownloadCommand(program);
 registerRepackCommand(program);
 registerInstallCommand(program);
+registerUpdateCommand(program);
 registerCacheCommand(program);
 
 program.parse();
