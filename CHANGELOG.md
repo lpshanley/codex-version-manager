@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/lpshanley/codex-version-manager/compare/cvm-v1.2.0...cvm-v1.3.0) (2026-03-09)
+
+
+### Features
+
+* add dry-run mode to mutating commands ([b207440](https://github.com/lpshanley/codex-version-manager/commit/b2074408a767268097054b0fac93bfdc180072c8))
+* improve cache management ([717b1d3](https://github.com/lpshanley/codex-version-manager/commit/717b1d38b3b93f90b72c4b050600a335e1d7dab3))
+
 ## [1.2.0](https://github.com/lpshanley/codex-version-manager/compare/cvm-v1.1.1...cvm-v1.2.0) (2026-03-08)
 
 
