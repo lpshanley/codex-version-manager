@@ -109,6 +109,25 @@ describe("registerDownloadCommand", () => {
 		);
 	});
 
+	it("reports the planned output in dry-run mode", async () => {
+		mocks.needsRepack.mockReturnValue(false);
+
+		const { registerDownloadCommand } = await import("./download.js");
+		const program = new Command();
+		registerDownloadCommand(program);
+		const outDir = mkdtempSync(join(tmpdir(), "cvm-download-test-"));
+
+		await program.parseAsync(["download", "latest", "--output", outDir, "--dry-run"], {
+			from: "user",
+		});
+
+		expect(mocks.downloadAndExtractRelease).not.toHaveBeenCalled();
+		expect(mocks.run).not.toHaveBeenCalled();
+		expect(logSpy).toHaveBeenCalledWith(
+			`[dry-run] Would download Codex 26.305.950 and save the app bundle to ${join(outDir, "Codex.app")}.`,
+		);
+	});
+
 	it("fails cleanly when the appcast is empty", async () => {
 		mocks.fetchVersions.mockResolvedValue([]);
 

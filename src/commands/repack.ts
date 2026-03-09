@@ -11,12 +11,26 @@ export function registerRepackCommand(program: Command): void {
 		.option("--no-cache", "Force rebuild everything (ignore cache)")
 		.option("--no-dmg", "Output bare .app instead of DMG")
 		.option("--keep-sparkle", "Keep Sparkle auto-update (advanced)", false)
+		.option("--dry-run", "Show what would happen without repacking")
 		.action(
 			async (
 				input: string,
 				output: string,
-				options: { sign: boolean; cache: boolean; dmg: boolean; keepSparkle: boolean },
+				options: {
+					sign: boolean;
+					cache: boolean;
+					dmg: boolean;
+					keepSparkle: boolean;
+					dryRun?: boolean;
+				},
 			) => {
+				if (options.dryRun) {
+					console.log(
+						`[dry-run] Would repack ${input} to ${output} as a ${options.dmg ? "DMG" : "bare app"}${options.keepSparkle ? " with Sparkle preserved" : ""}.`,
+					);
+					return;
+				}
+
 				await repackApp({
 					input,
 					output,

@@ -16,50 +16,68 @@ export function registerDownloadCommand(program: Command): void {
 		.option("-o, --output <path>", "Output directory", join(homedir(), "Downloads"))
 		.option("--no-sign", "Skip ad-hoc code signing")
 		.option("--no-cache", "Force rebuild everything (ignore cache)")
-		.action(async (version: string, options: { output: string; sign: boolean; cache: boolean }) => {
-			const log = (msg: string) => console.log(`[download] ${msg}`);
+		.option("--dry-run", "Show what would happen without downloading or writing files")
+		.action(
+			async (
+				version: string,
+				options: { output: string; sign: boolean; cache: boolean; dryRun?: boolean },
+			) => {
+				const log = (msg: string) => console.log(`[download] ${msg}`);
 
-			log(`System architecture: ${currentArch()}`);
+				log(`System architecture: ${currentArch()}`);
 
-			// 1. Resolve version
-			log("Fetching version list");
-			const items = requireAppcastItems(await fetchVersions());
+				// 1. Resolve version
+				log("Fetching version list");
+				const items = requireAppcastItems(await fetchVersions());
 
-			const item = resolveVersion(items, version);
-			log(`Selected: ${item.version} (build ${item.build}, ${formatSize(item.size)})`);
+				const item = resolveVersion(items, version);
+				log(`Selected: ${item.version} (build ${item.build}, ${formatSize(item.size)})`);
+				const outDir = resolve(options.output);
 
-			// 2. Download
-			const workDir = join(tmpdir(), `cvm-download-${Date.now()}`);
-			mkdirSync(workDir, { recursive: true });
-			const { appName, appPath: srcApp } = downloadAndExtractRelease(item, workDir, log);
-			const outDir = resolve(options.output);
-			mkdirSync(outDir, { recursive: true });
+				if (options.dryRun) {
+					const outputPath = needsRepack()
+						? join(outDir, "CodexIntel.dmg")
+						: join(outDir, "Codex.app");
+					console.log(
+						needsRepack()
+							? `[dry-run] Would download Codex ${item.version}, repack it for Intel, and write ${outputPath}.`
+							: `[dry-run] Would download Codex ${item.version} and save the app bundle to ${outputPath}.`,
+					);
+					return;
+				}
 
-			if (needsRepack()) {
-				// Intel: repack → DMG
-				log("Intel architecture detected — repacking for x64");
-				const dmgPath = join(outDir, "CodexIntel.dmg");
-				await repackApp(
-					{
-						input: srcApp,
-						output: dmgPath,
-						sign: options.sign,
-						cache: options.cache,
-						keepSparkle: false,
-						createDmg: true,
-					},
-					log,
-				);
+				// 2. Download
+				const workDir = join(tmpdir(), `cvm-download-${Date.now()}`);
+				mkdirSync(workDir, { recursive: true });
+				const { appName, appPath: srcApp } = downloadAndExtractRelease(item, workDir, log);
+				mkdirSync(outDir, { recursive: true });
 
-				rmSync(workDir, { recursive: true, force: true });
-				log(`Codex ${item.version} (Intel) saved to ${dmgPath}`);
-			} else {
-				// ARM: just copy the .app to output dir
-				const appDst = join(outDir, appName);
-				run(`ditto ${JSON.stringify(srcApp)} ${JSON.stringify(appDst)}`, { stdio: "pipe" });
+				if (needsRepack()) {
+					// Intel: repack → DMG
+					log("Intel architecture detected — repacking for x64");
+					const dmgPath = join(outDir, "CodexIntel.dmg");
+					await repackApp(
+						{
+							input: srcApp,
+							output: dmgPath,
+							sign: options.sign,
+							cache: options.cache,
+							keepSparkle: false,
+							createDmg: true,
+						},
+						log,
+					);
 
-				rmSync(workDir, { recursive: true, force: true });
-				log(`Codex ${item.version} saved to ${appDst}`);
-			}
-		});
+					rmSync(workDir, { recursive: true, force: true });
+					log(`Codex ${item.version} (Intel) saved to ${dmgPath}`);
+				} else {
+					// ARM: just copy the .app to output dir
+					const appDst = join(outDir, appName);
+					run(`ditto ${JSON.stringify(srcApp)} ${JSON.stringify(appDst)}`, { stdio: "pipe" });
+
+					rmSync(workDir, { recursive: true, force: true });
+					log(`Codex ${item.version} saved to ${appDst}`);
+				}
+			},
+		);
 }

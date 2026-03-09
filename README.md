@@ -40,9 +40,16 @@ Download and install a specific version (or `latest`) to `/Applications/Codex.ap
 cvm install                  # install latest
 cvm install 25.200.800       # install specific version
 cvm install latest --dest ~/Apps/Codex.app
+cvm install latest --dry-run
 ```
 
 On Intel, the app is automatically repacked with native x86_64 Electron, native modules, and CLI binaries before installing.
+
+Options:
+- `--dest <path>` — install destination (default `/Applications/Codex.app`)
+- `--no-sign` — skip ad-hoc code signing
+- `--no-cache` — rebuild everything from scratch
+- `--dry-run` — resolve the version and show the planned install without downloading or writing files
 
 ### `cvm download [version]`
 
@@ -52,9 +59,16 @@ Download a version to `~/Downloads` without installing.
 cvm download                 # download latest
 cvm download 25.200.800      # download specific version
 cvm download latest -o ~/Desktop
+cvm download latest --dry-run
 ```
 
 On Intel, produces a `CodexIntel.dmg` with an Applications shortcut for drag-to-install. On Apple Silicon, copies the `.app` directly.
+
+Options:
+- `-o, --output <path>` — output directory (default `~/Downloads`)
+- `--no-sign` — skip ad-hoc code signing
+- `--no-cache` — rebuild everything from scratch
+- `--dry-run` — resolve the version and show the planned output without downloading or writing files
 
 ### `cvm repack <input> [output]`
 
@@ -64,6 +78,7 @@ Manually repack a `.app` or `.dmg` for Intel. Useful for converting an already-d
 cvm repack ~/Downloads/Codex.app           # → CodexIntel.dmg
 cvm repack ~/Downloads/Codex.app My.app --no-dmg
 cvm repack ~/Downloads/Codex.dmg
+cvm repack ~/Downloads/Codex.dmg --dry-run
 ```
 
 Options:
@@ -71,6 +86,7 @@ Options:
 - `--no-cache` — rebuild everything from scratch
 - `--no-dmg` — output a bare `.app` instead of a DMG
 - `--keep-sparkle` — keep Sparkle auto-update (advanced)
+- `--dry-run` — inspect the request and show the planned repack without writing output
 
 ### `cvm update`
 
@@ -79,6 +95,7 @@ Check for and install Codex updates. Compares the installed version against the 
 ```sh
 cvm update                   # check and update interactively
 cvm update --yes             # skip confirmation prompts
+cvm update --dry-run
 ```
 
 If Codex is not installed, offers to install the latest version. If an update is available, confirms before proceeding — automatically closing Codex if it's running and reopening it after the update.
@@ -88,6 +105,7 @@ Options:
 - `--yes` — skip confirmation prompts
 - `--no-sign` — skip ad-hoc code signing
 - `--no-cache` — rebuild everything from scratch
+- `--dry-run` — check the installed version and show the planned install or update without changing the app
 
 ### `cvm inspect <path>`
 

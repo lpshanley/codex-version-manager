@@ -116,6 +116,22 @@ describe("registerUpdateCommand", () => {
 		);
 	});
 
+	it("reports the planned install when the app is missing in dry-run mode", async () => {
+		const missingPath = join(tmpdir(), "cvm-missing-app-dry-run", "Codex.app");
+
+		const { registerUpdateCommand } = await import("./update.js");
+		const program = new Command();
+		registerUpdateCommand(program);
+
+		await program.parseAsync(["update", "--dest", missingPath, "--dry-run"], { from: "user" });
+
+		expect(mocks.confirm).not.toHaveBeenCalled();
+		expect(mocks.installVersion).not.toHaveBeenCalled();
+		expect(logSpy).toHaveBeenCalledWith(
+			`[dry-run] Would install Codex 26.305.950 to ${missingPath}.`,
+		);
+	});
+
 	it("updates and reopens the app when it was running", async () => {
 		const appPath = mkdtempSync(join(tmpdir(), "cvm-update-running-"));
 		mkdirSync(join(appPath, "Contents"), { recursive: true });
@@ -142,5 +158,37 @@ describe("registerUpdateCommand", () => {
 		expect(mocks.quitApp).toHaveBeenCalledWith("Codex");
 		expect(mocks.installVersion).toHaveBeenCalled();
 		expect(mocks.openApp).toHaveBeenCalledWith(appPath);
+	});
+
+	it("reports the planned update in dry-run mode", async () => {
+		const appPath = mkdtempSync(join(tmpdir(), "cvm-update-dry-run-"));
+		mkdirSync(join(appPath, "Contents"), { recursive: true });
+		mocks.inspectApp.mockResolvedValue({
+			version: "26.200.1000",
+			build: "1000",
+			name: "Codex",
+			bundleId: "com.openai.codex",
+			architectures: ["arm64"],
+			minSystemVersion: "13.0",
+			feedUrl: null,
+			sparklePublicKey: null,
+			isElectron: true,
+			nativeModules: [],
+		});
+		mocks.isAppRunning.mockReturnValue(true);
+
+		const { registerUpdateCommand } = await import("./update.js");
+		const program = new Command();
+		registerUpdateCommand(program);
+
+		await program.parseAsync(["update", "--dest", appPath, "--dry-run"], { from: "user" });
+
+		expect(mocks.confirm).not.toHaveBeenCalled();
+		expect(mocks.quitApp).not.toHaveBeenCalled();
+		expect(mocks.installVersion).not.toHaveBeenCalled();
+		expect(mocks.openApp).not.toHaveBeenCalled();
+		expect(logSpy).toHaveBeenCalledWith(
+			`[dry-run] Would update ${appPath} to Codex 26.305.950, closing and reopening Codex around the install.`,
+		);
 	});
 });

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
 	currentArch: vi.fn(),
 	fetchVersions: vi.fn(),
 	installVersion: vi.fn(),
+	needsRepack: vi.fn(),
 	resolveVersion: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock("../lib/appcast.js", async () => {
 
 vi.mock("../lib/arch.js", () => ({
 	currentArch: mocks.currentArch,
+	needsRepack: mocks.needsRepack,
 }));
 
 vi.mock("../lib/install.js", () => ({
@@ -31,6 +33,7 @@ describe("registerInstallCommand", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mocks.currentArch.mockReturnValue("arm64 (Apple Silicon)");
+		mocks.needsRepack.mockReturnValue(false);
 		mocks.fetchVersions.mockResolvedValue([
 			{
 				version: "26.305.950",
@@ -66,6 +69,24 @@ describe("registerInstallCommand", () => {
 				cache: true,
 			},
 			expect.any(Function),
+		);
+	});
+
+	it("reports the planned install in dry-run mode", async () => {
+		const { registerInstallCommand } = await import("./install.js");
+		const program = new Command();
+		registerInstallCommand(program);
+
+		await program.parseAsync(
+			["install", "latest", "--dest", "/Applications/Codex.app", "--dry-run"],
+			{
+				from: "user",
+			},
+		);
+
+		expect(mocks.installVersion).not.toHaveBeenCalled();
+		expect(logSpy).toHaveBeenCalledWith(
+			"[dry-run] Would download Codex 26.305.950 and install it to /Applications/Codex.app.",
 		);
 	});
 });
