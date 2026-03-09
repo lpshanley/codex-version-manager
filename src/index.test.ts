@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildProgram } from "./index.js";
+import { buildProgram } from "./cli.js";
 import { getCliVersion } from "./lib/meta.js";
 
 const packageJson = JSON.parse(
