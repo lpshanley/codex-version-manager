@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/lpshanley/codex-version-manager/compare/cvm-v1.3.0...cvm-v1.3.1) (2026-03-09)
+
+
+### Bug Fixes
+
+* restore npx compatibility for CLI entrypoint ([7ddc978](https://github.com/lpshanley/codex-version-manager/commit/7ddc978f24dd6c2a74737d81ebe106a16a84eb63))
+
 ## [1.3.0](https://github.com/lpshanley/codex-version-manager/compare/cvm-v1.2.0...cvm-v1.3.0) (2026-03-09)
 
 
